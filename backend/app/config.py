@@ -16,10 +16,16 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
 
-    openrouter_api_key: str = ""
-    openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_model: str = "openai/gpt-4o-mini"
     enable_llm: bool = False
+    llm_provider_order: str = "gemini,openai,grok,deepseek"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    grok_api_key: str = ""
+    grok_model: str = "grok-3-mini"
+    deepseek_api_key: str = ""
+    deepseek_model: str = "deepseek-chat"
 
     mongo_uri: str = "mongodb://localhost:27017"
     mongo_db: str = "ai_teacher"
@@ -32,7 +38,7 @@ class Settings(BaseSettings):
     allowed_languages: list[str] = ["en", "hi", "hinglish"]
 
     if "SettingsConfigDict" in globals():
-        model_config = SettingsConfigDict(env_file=".env")
+        model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     else:
         class Config:
             env_file = ".env"
