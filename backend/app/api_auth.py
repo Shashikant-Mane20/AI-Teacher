@@ -37,7 +37,7 @@ async def me(user: dict = Depends(current_user)):
 async def get_my_profile(user: dict = Depends(current_user)):
     profile = await find_profile(user["user_id"])
     if profile is None:
-        profile = {"user_id": user["user_id"], "email": user["email"], "name": user["name"]}
+        profile = {"user_id": user["user_id"], "email": user["email"], "name": user["name"], "avatar_url": None}
     return profile
 
 

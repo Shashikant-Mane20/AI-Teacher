@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 class StudentProfileUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=100)
+    avatar_url: str | None = None
     educational_level: str = "other"
     preferred_language: str = "english"
     explanation_minutes: int = Field(default=20, ge=1, le=240)
