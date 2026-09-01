@@ -46,6 +46,7 @@ function App() {
     const id = lessonData?.lesson_id || 'lesson_001'
     await api.lessonAction(id, 'start')
     socketRef.current?.close()
+    setMessage('Connecting to teacher channel...')
     socketRef.current = openLessonSocket(id, setMessage, () => setMessage('Teacher channel unavailable'))
   }, 'Live teacher channel ready')
 

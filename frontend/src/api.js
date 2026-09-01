@@ -27,6 +27,7 @@ export const api = {
 export function openLessonSocket(lessonId, onMessage, onError) {
   const socket = new WebSocket(`${API_URL.replace(/^http/, 'ws')}/ws/lesson/${lessonId}`)
   socket.addEventListener('open', () => socket.send('START_LESSON'))
+  socket.addEventListener('close', () => onError?.())
   socket.addEventListener('message', (event) => onMessage(event.data))
   socket.addEventListener('error', onError)
   return socket
