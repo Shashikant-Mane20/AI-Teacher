@@ -2,13 +2,22 @@ import { useEffect, useRef, useState } from 'react'
 import { api, openLessonSocket } from './api'
 import './App.css'
 
+const initialLesson = {
+  topic: "Ohm's Law",
+  learner_level: 'beginner',
+  language: 'en',
+  available_time_minutes: 30,
+  learning_goal: 'Understand voltage, current, and resistance.',
+  teaching_style: 'simple',
+}
+
 function App() {
-  const [student, setStudent] = useState({ name: 'Aarav', level: 'beginner', preferred_language: 'en', learning_goal: 'Build strong science fundamentals' })
-  const [lesson, setLesson] = useState({ topic: "Ohm's Law", learner_level: 'beginner', language: 'en', available_time_minutes: 30, learning_goal: 'Understand voltage, current, and resistance.', teaching_style: 'simple' })
-  const [profile, setProfile] = useState(null)
+  const [lesson, setLesson] = useState(initialLesson)
   const [lessonData, setLessonData] = useState(null)
+  const [question, setQuestion] = useState(null)
+  const [answer, setAnswer] = useState('')
+  const [feedback, setFeedback] = useState(null)
   const [assessment, setAssessment] = useState(null)
-  const [document, setDocument] = useState(null)
   const [status, setStatus] = useState('Checking API connection...')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -17,41 +26,44 @@ function App() {
   useEffect(() => {
     const checkHealth = () => api.health().then(() => setStatus('API connected')).catch(() => setStatus('API offline'))
     checkHealth()
-    const healthTimer = setInterval(checkHealth, 5000)
-    return () => {
-      clearInterval(healthTimer)
-      socketRef.current?.close()
-    }
+    const timer = setInterval(checkHealth, 5000)
+    return () => { clearInterval(timer); socketRef.current?.close() }
   }, [])
 
-  const update = (setter, field, value) => setter((current) => ({ ...current, [field]: value }))
-  const run = async (action, successMessage) => {
+  const updateLesson = (field, value) => setLesson((current) => ({ ...current, [field]: value }))
+  const run = async (action, success) => {
     setBusy(true); setMessage('')
-    try { await action(); setMessage(successMessage) } catch (error) { setMessage(error.message) } finally { setBusy(false) }
+    try { await action(); if (success) setMessage(success) } catch (error) { setMessage(error.message) } finally { setBusy(false) }
   }
-  const createStudent = () => run(async () => setProfile(await api.createStudent(student)), 'Student profile created')
   const createLesson = () => run(async () => setLessonData(await api.createLesson(lesson)), 'Lesson plan generated')
-  const generateAssessment = () => run(async () => setAssessment(await api.generateAssessment({ student_id: profile?.id || 'student_001', lesson_id: lessonData?.lesson_id || 'lesson_001', question_ids: ['question_001', 'question_002'] })), 'Assessment generated')
-  const uploadDocument = (event) => {
-    const file = event.target.files?.[0]; if (!file) return
-    const formData = new FormData(); formData.append('file', file); formData.append('title', file.name); formData.append('language', lesson.language)
-    run(async () => {
-      const uploaded = await api.uploadDocument(formData)
-      setDocument(uploaded)
-      update(setLesson, 'uploaded_document_id', uploaded.document_id)
-    }, 'Document uploaded and processed')
-  }
-  const startLesson = () => run(async () => {
-    const lessonId = lessonData?.lesson_id || 'lesson_001'; await api.lessonAction(lessonId, 'start')
-    socketRef.current?.close(); socketRef.current = openLessonSocket(lessonId, setMessage, () => setMessage('WebSocket connection unavailable'))
-  }, 'Lesson started. Teacher channel is ready.')
+  const createQuestion = () => run(async () => {
+    const data = await api.createQuestion(lessonData?.lesson_id || 'lesson_001', { lesson_id: lessonData?.lesson_id || 'lesson_001', concept: lessonData?.plan.objectives[0]?.concept || lesson.topic, question_type: 'mcq' })
+    setQuestion(data); setFeedback(null); setAnswer('')
+  }, 'Question ready')
+  const submitAnswer = () => run(async () => setFeedback(await api.submitAnswer(question.lesson_id, { lesson_id: question.lesson_id, question_id: question.id, student_answer: answer })), 'Answer evaluated')
+  const generateAssessment = () => run(async () => setAssessment(await api.generateAssessment({ student_id: 'student_001', lesson_id: lessonData?.lesson_id || 'lesson_001', question_ids: question ? [question.id] : [] })), 'Assessment updated')
+  const startLiveLesson = () => run(async () => {
+    const id = lessonData?.lesson_id || 'lesson_001'
+    await api.lessonAction(id, 'start')
+    socketRef.current?.close()
+    socketRef.current = openLessonSocket(id, setMessage, () => setMessage('Teacher channel unavailable'))
+  }, 'Live teacher channel ready')
 
-  return (
-    <main className="min-h-screen bg-[#f5f6f0] text-slate-900"><header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5"><div><p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-700">AI Teacher</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Your learning studio</h1></div><div className={`rounded-full px-3 py-1 text-xs font-semibold ${status === 'API connected' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{status}</div></div></header><div className="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-[1.05fr_0.95fr]"><section className="space-y-6"><div className="rounded-3xl bg-[#0e3b32] p-8 text-white shadow-xl"><p className="text-sm text-emerald-200">A focused session for today</p><h2 className="mt-3 text-4xl font-semibold tracking-tight">Learn clearly. Practice boldly.</h2><p className="mt-4 max-w-lg text-sm leading-6 text-emerald-100">Create a profile, generate a lesson, and use the live teacher channel to keep learning adaptive.</p><div className="mt-7 flex flex-wrap gap-3 text-xs font-semibold"><span className="rounded-full bg-white/10 px-3 py-2">English · Hindi · Hinglish</span><span className="rounded-full bg-lime-300 px-3 py-2 text-emerald-950">Connected to FastAPI</span></div></div><div className="grid gap-6 md:grid-cols-2"><Panel title="01 · Student profile" detail="Tell the teacher who is learning."><input className="field" value={student.name} onChange={(e) => update(setStudent, 'name', e.target.value)} placeholder="Student name" /><div className="grid grid-cols-2 gap-3"><select className="field" value={student.level} onChange={(e) => update(setStudent, 'level', e.target.value)}><option>beginner</option><option>intermediate</option><option>advanced</option></select><select className="field" value={student.preferred_language} onChange={(e) => update(setStudent, 'preferred_language', e.target.value)}><option value="en">English</option><option value="hi">Hindi</option><option value="hinglish">Hinglish</option></select></div><input className="field" value={student.learning_goal} onChange={(e) => update(setStudent, 'learning_goal', e.target.value)} placeholder="Learning goal" /><button className="button" disabled={busy} onClick={createStudent}>Create profile</button></Panel><Panel title="02 · Study material" detail="Add context for the lesson engine."><label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm text-slate-500 hover:border-emerald-500"><span className="text-2xl">↑</span><span>{document ? document.metadata?.file_name : 'Upload a PDF, DOCX, or PPTX'}</span><input className="hidden" type="file" onChange={uploadDocument} /></label>{document && <p className="text-xs text-emerald-700">{document.chunks_count} chunks processed</p>}</Panel></div><Panel title="03 · Generate a lesson" detail="Shape the next lesson around the learner."><div className="grid gap-3 sm:grid-cols-2"><input className="field" value={lesson.topic} onChange={(e) => update(setLesson, 'topic', e.target.value)} placeholder="Topic" /><select className="field" value={lesson.teaching_style} onChange={(e) => update(setLesson, 'teaching_style', e.target.value)}><option value="simple">Simple explanations</option><option value="visual">Visual learning</option><option value="socratic">Socratic questions</option></select><select className="field" value={lesson.language} onChange={(e) => update(setLesson, 'language', e.target.value)}><option value="en">English</option><option value="hi">Hindi</option><option value="hinglish">Hinglish</option></select><input className="field" type="number" min="5" value={lesson.available_time_minutes} onChange={(e) => update(setLesson, 'available_time_minutes', Number(e.target.value))} /></div><textarea className="field min-h-24" value={lesson.learning_goal} onChange={(e) => update(setLesson, 'learning_goal', e.target.value)} placeholder="What should the learner achieve?" /><button className="button" disabled={busy} onClick={createLesson}>Generate lesson plan</button></Panel></section><section className="space-y-6"><Panel title="Lesson workspace" detail={lessonData ? `${lessonData.plan.duration_minutes} minutes · ${lessonData.plan.language}` : 'Your generated plan will appear here.'}>{lessonData ? <div className="space-y-5"><div><p className="text-xs font-bold uppercase tracking-widest text-emerald-700">{lessonData.plan.level}</p><h2 className="mt-1 text-3xl font-semibold">{lessonData.plan.topic}</h2></div><div className="rounded-2xl bg-emerald-50 p-5"><p className="font-semibold text-emerald-950">{lessonData.plan.objectives[0].concept}</p><p className="mt-2 text-sm leading-6 text-emerald-900">{lessonData.plan.objectives[0].explanation}</p><p className="mt-3 text-sm italic text-emerald-700">Example: {lessonData.plan.objectives[0].example}</p></div><div><p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">Questions to explore</p>{lessonData.plan.questions_to_ask.map((question) => <p className="border-b border-slate-100 py-2 text-sm" key={question}>{question}</p>)}</div><div className="flex flex-wrap gap-3"><button className="button" onClick={startLesson}>Start live lesson</button><button className="button-secondary" onClick={() => run(() => api.lessonAction(lessonData.lesson_id, 'adapt'), 'Lesson adapted to current progress')}>Adapt lesson</button></div></div> : <EmptyState />}</Panel><Panel title="Progress check" detail="Generate a report after the lesson.">{assessment ? <div className="space-y-4"><div className="flex items-end gap-3"><span className="text-5xl font-semibold text-emerald-700">{assessment.score}%</span><span className="pb-2 text-sm text-slate-500">readiness score</span></div><p className="text-sm"><strong>Strong:</strong> {assessment.strong_areas.join(', ')}</p><p className="text-sm"><strong>Practice next:</strong> {assessment.weak_areas.join(', ')}</p><p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Next topic: {assessment.next_topic}</p></div> : <><p className="text-sm leading-6 text-slate-500">The assessment endpoint will evaluate the current lesson and recommend the next topic.</p><button className="button-secondary mt-4" onClick={generateAssessment}>Generate assessment</button></>}</Panel>{message && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{message}</div>}</section></div></main>
-  )
+  return <main className="min-h-screen bg-[#f5f6f0] text-slate-900">
+    <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5"><div><p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-700">AI Teacher</p><h1 className="mt-1 text-2xl font-semibold">Adaptive learning studio</h1></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${status === 'API connected' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{status}</span></div></header>
+    <div className="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-[0.9fr_1.1fr]">
+      <section className="space-y-6"><div className="rounded-3xl bg-[#0e3b32] p-8 text-white shadow-xl"><p className="text-sm text-emerald-200">Understand → Practice → Adapt</p><h2 className="mt-3 text-4xl font-semibold tracking-tight">A teacher that changes with you.</h2><p className="mt-4 text-sm leading-6 text-emerald-100">Ground a lesson in your topic, test understanding, and get a simpler explanation when you need one.</p></div>
+        <Panel title="Create a lesson" detail="Choose the learner's goal and language."><input className="field" value={lesson.topic} onChange={(e) => updateLesson('topic', e.target.value)} placeholder="Topic" /><div className="grid grid-cols-2 gap-3"><select className="field" value={lesson.learner_level} onChange={(e) => updateLesson('learner_level', e.target.value)}><option>beginner</option><option>intermediate</option><option>advanced</option></select><select className="field" value={lesson.language} onChange={(e) => updateLesson('language', e.target.value)}><option value="en">English</option><option value="hi">Hindi</option><option value="hinglish">Hinglish</option></select></div><textarea className="field min-h-24" value={lesson.learning_goal} onChange={(e) => updateLesson('learning_goal', e.target.value)} /><button className="button" disabled={busy} onClick={createLesson}>Generate lesson plan</button></Panel>
+        <Panel title="Teaching controls" detail="Start the live session or request a new question."><div className="flex flex-wrap gap-3"><button className="button" onClick={startLiveLesson}>Start live lesson</button><button className="button-secondary" disabled={!lessonData || busy} onClick={createQuestion}>Ask a question</button></div><p className="text-xs text-slate-500">The live channel uses the FastAPI WebSocket lesson session.</p></Panel>
+      </section>
+      <section className="space-y-6"><Panel title="Lesson workspace" detail={lessonData ? `${lessonData.plan.duration_minutes} minutes · ${lessonData.plan.language}` : 'Generate a plan to begin.'}>{lessonData ? <div className="space-y-4"><div><p className="text-xs font-bold uppercase tracking-widest text-emerald-700">{lessonData.plan.level}</p><h2 className="mt-1 text-3xl font-semibold">{lessonData.plan.topic}</h2></div><div className="rounded-2xl bg-emerald-50 p-5"><p className="font-semibold text-emerald-950">{lessonData.plan.objectives[0].concept}</p><p className="mt-2 text-sm leading-6 text-emerald-900">{lessonData.plan.objectives[0].explanation}</p></div><p className="text-sm text-slate-500">{lessonData.plan.questions_to_ask[0]}</p></div> : <EmptyState />}</Panel>
+        <Panel title="Student interaction" detail="Answer honestly so the teacher can adapt.">{question ? <div className="space-y-4"><p className="font-semibold">{question.prompt}</p><div className="grid gap-2">{question.options?.map((option) => <button className={`rounded-xl border px-4 py-3 text-left text-sm transition ${answer === option ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 bg-white hover:border-emerald-400'}`} key={option} onClick={() => setAnswer(option)}>{option}</button>)}</div><div className="flex gap-3"><button className="button" disabled={!answer || busy} onClick={submitAnswer}>Submit answer</button><button className="button-secondary" onClick={createQuestion}>New question</button></div>{feedback && <div className={`rounded-2xl p-4 text-sm ${feedback.is_correct ? 'bg-emerald-50 text-emerald-900' : 'bg-amber-50 text-amber-900'}`}><strong>{feedback.is_correct ? 'Correct' : 'Let us re-learn this'}</strong><p className="mt-1">{feedback.explanation}</p><p className="mt-2 font-semibold">Next action: {feedback.next_action}</p>{feedback.misconception && <p className="mt-1">Misconception: {feedback.misconception}</p>}</div>}</div> : <EmptyState text="Ask a question after generating a lesson." />}</Panel>
+        <Panel title="Learning report" detail="Turn attempts into the next recommendation.">{assessment ? <div className="space-y-3"><p className="text-5xl font-semibold text-emerald-700">{assessment.score}%</p><p className="text-sm"><strong>Strong:</strong> {assessment.strong_areas.join(', ') || 'Keep practicing'}</p><p className="text-sm"><strong>Focus:</strong> {assessment.weak_areas.join(', ') || 'Ready for the next concept'}</p></div> : <button className="button-secondary" onClick={generateAssessment}>Generate assessment</button>}</Panel>{message && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{message}</div>}</section>
+    </div>
+  </main>
 }
 
 function Panel({ title, detail, children }) { return <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="mb-5"><h2 className="text-lg font-semibold">{title}</h2><p className="mt-1 text-sm text-slate-500">{detail}</p></div><div className="space-y-3">{children}</div></div> }
-function EmptyState() { return <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl bg-slate-50 px-8 text-center"><span className="text-4xl">✦</span><p className="mt-4 font-semibold">No lesson plan yet</p><p className="mt-2 max-w-xs text-sm leading-6 text-slate-500">Complete the details to bring the teacher workspace to life.</p></div> }
+function EmptyState({ text = 'Your generated lesson will appear here.' }) { return <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl bg-slate-50 px-8 text-center"><span className="text-3xl">✦</span><p className="mt-3 text-sm text-slate-500">{text}</p></div> }
 
 export default App

@@ -8,11 +8,14 @@ from app.schemas.question import (
 )
 from app.services.adaptation_service import AdaptationService
 from app.services.question_service import QuestionService
+from app.services.assessment_service import AssessmentService
 
 router = APIRouter(prefix="/lessons", tags=["interactive teaching"])
 question_service = QuestionService()
 adaptation_service = AdaptationService()
+assessment_service = AssessmentService()
 questions: dict[str, dict] = {}
+attempts: dict[str, list[dict]] = {}
 
 
 @router.post("/{lesson_id}/question", response_model=Question)
@@ -50,9 +53,18 @@ async def submit_answer(lesson_id: str, payload: EvaluateAnswerRequest):
     misconception = None if is_correct else (
         f"The learner selected '{payload.student_answer}' instead of the expected concept answer."
     )
-    return {
+    attempt = {
+        "question_id": payload.question_id,
+        "concept": question["concept"],
+        "student_answer": payload.student_answer,
         "is_correct": is_correct,
         "score": 100.0 if is_correct else 0.0,
+    }
+    attempts.setdefault(lesson_id, []).append(attempt)
+    strategy = await adaptation_service.adapt_for_student("beginner", attempts[lesson_id])
+    return {
+        "is_correct": is_correct,
+        "score": attempt["score"],
         "explanation": (
             "Correct. The answer matches the concept."
             if is_correct
@@ -60,7 +72,7 @@ async def submit_answer(lesson_id: str, payload: EvaluateAnswerRequest):
         ),
         "misconception_detected": not is_correct,
         "misconception": misconception,
-        "next_action": "CONTINUE" if is_correct else "REEXPLAIN + ANALOGY",
+        "next_action": strategy["action"] if not is_correct else "CONTINUE",
     }
 
 
@@ -71,10 +83,14 @@ async def evaluate_answer(lesson_id: str, payload: EvaluateAnswerRequest):
 
 @router.post("/{lesson_id}/continue")
 async def continue_lesson(lesson_id: str):
-    strategy = await adaptation_service.adapt_for_student("beginner", [])
+    strategy = await adaptation_service.adapt_for_student("beginner", attempts.get(lesson_id, []))
     return {
         "lesson_id": lesson_id,
         "status": "continued",
         "next_action": "CONTINUE",
         "strategy": strategy,
     }
+
+
+def get_lesson_attempts(lesson_id: str) -> list[dict]:
+    return attempts.get(lesson_id, [])
