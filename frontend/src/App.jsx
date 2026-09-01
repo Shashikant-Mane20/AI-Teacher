@@ -48,6 +48,10 @@ function App() {
     socketRef.current?.close()
     setMessage('Connecting to teacher channel...')
     socketRef.current = openLessonSocket(id, setMessage, () => setMessage('Teacher channel unavailable'))
+    const firstQuestion = await api.createQuestion(id, { lesson_id: id, concept: lessonData?.plan.objectives[0]?.concept || lesson.topic, question_type: 'mcq' })
+    setQuestion(firstQuestion)
+    setFeedback(null)
+    setAnswer('')
   }, 'Live teacher channel ready')
 
   return <main className="min-h-screen bg-[#f5f6f0] text-slate-900">
