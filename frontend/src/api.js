@@ -21,6 +21,7 @@ export const api = {
   generateAssessment: (payload) => request('/api/v1/assessments/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   uploadDocument: (formData) => request('/api/v1/documents/upload', { method: 'POST', body: formData }),
   getDocument: (id) => request(`/api/v1/documents/${id}`),
+  generateVideo: (payload) => request('/api/v1/video/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
 }
 
 export function openLessonSocket(lessonId, onMessage, onError) {

@@ -35,7 +35,11 @@ function App() {
   const uploadDocument = (event) => {
     const file = event.target.files?.[0]; if (!file) return
     const formData = new FormData(); formData.append('file', file); formData.append('title', file.name); formData.append('language', lesson.language)
-    run(async () => setDocument(await api.uploadDocument(formData)), 'Document uploaded and processed')
+    run(async () => {
+      const uploaded = await api.uploadDocument(formData)
+      setDocument(uploaded)
+      update(setLesson, 'uploaded_document_id', uploaded.document_id)
+    }, 'Document uploaded and processed')
   }
   const startLesson = () => run(async () => {
     const lessonId = lessonData?.lesson_id || 'lesson_001'; await api.lessonAction(lessonId, 'start')

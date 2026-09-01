@@ -1,24 +1,33 @@
 from fastapi import APIRouter
 
 from app.schemas.lesson import LessonCreateRequest, LessonResponse
+from app.api.documents import get_document_context
+from app.services.video_service import VideoService
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
+video_service = VideoService()
 
 
 @router.post("/create", response_model=LessonResponse)
 async def create_lesson(payload: LessonCreateRequest):
     lesson_id = "lesson_001"
+    document = get_document_context(payload.uploaded_document_id) if payload.uploaded_document_id else None
+    document_text = document["text"] if document else ""
+    topic = payload.topic
+    if document and (not topic or topic.lower() in {"uploaded document", "document"}):
+        topic = document["metadata"]["title"]
+    source_hint = document_text[:500] if document_text else f"Explain {topic} in a clear and simple way."
     plan = {
         "lesson_id": lesson_id,
-        "topic": payload.topic,
+        "topic": topic,
         "level": payload.learner_level,
         "language": payload.language,
         "duration_minutes": payload.available_time_minutes,
         "objectives": [
             {
                 "concept": "Core concept",
-                "explanation": f"Explain {payload.topic} in a clear and simple way.",
-                "example": "Use a real-world example.",
+                "explanation": source_hint,
+                "example": "Use an example grounded in the uploaded material.",
                 "visual_type": "diagram",
             }
         ],
