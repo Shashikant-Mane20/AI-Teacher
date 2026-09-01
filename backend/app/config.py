@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     grok_api_key: str = ""
     grok_model: str = "grok-3-mini"
     deepseek_api_key: str = ""
-    deepseek_model: str = "deepseek-chat"
+    deepseek_model: str = "deepseek-v4-pro"
 
     mongo_uri: str = "mongodb://localhost:27017"
     mongo_db: str = "ai_teacher"

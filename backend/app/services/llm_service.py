@@ -43,11 +43,12 @@ class LLMService:
         try:
             if provider == "gemini":
                 content = await self._request_gemini(api_key, model, system_prompt, user_prompt)
+            elif provider == "deepseek":
+                content = await self._request_deepseek(api_key, model, system_prompt, user_prompt)
             else:
                 base_urls = {
                     "openai": "https://api.openai.com/v1",
                     "grok": "https://api.x.ai/v1",
-                    "deepseek": "https://api.deepseek.com",
                 }
                 response = await client.post(
                     f"{base_urls[provider]}/chat/completions",
@@ -63,10 +64,10 @@ class LLMService:
                     },
                 )
                 content = response.json()["choices"][0]["message"]["content"]
-            response.raise_for_status()
+                response.raise_for_status()
             result = json.loads(content)
             return result if isinstance(result, dict) else None
-        except (httpx.HTTPError, KeyError, IndexError, TypeError, json.JSONDecodeError, RuntimeError):
+        except Exception:
             return None
 
     async def _request_gemini(
@@ -86,3 +87,27 @@ class LLMService:
             return interaction.output_text
 
         return await asyncio.to_thread(create_interaction)
+
+    async def _request_deepseek(
+        self, api_key: str, model: str, system_prompt: str, user_prompt: str
+    ) -> str:
+        try:
+            from openai import OpenAI
+        except ImportError as error:
+            raise RuntimeError("Install openai to use DeepSeek") from error
+
+        def create_completion():
+            client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                stream=False,
+                reasoning_effort="high",
+                extra_body={"thinking": {"type": "enabled"}},
+            )
+            return response.choices[0].message.content or ""
+
+        return await asyncio.to_thread(create_completion)
