@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Any
 
@@ -41,16 +42,7 @@ class LLMService:
     ) -> dict[str, Any] | None:
         try:
             if provider == "gemini":
-                response = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                    params={"key": api_key},
-                    json={
-                        "systemInstruction": {"parts": [{"text": system_prompt}]},
-                        "contents": [{"parts": [{"text": user_prompt}]}],
-                        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.3},
-                    },
-                )
-                content = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+                content = await self._request_gemini(api_key, model, system_prompt, user_prompt)
             else:
                 base_urls = {
                     "openai": "https://api.openai.com/v1",
@@ -74,5 +66,23 @@ class LLMService:
             response.raise_for_status()
             result = json.loads(content)
             return result if isinstance(result, dict) else None
-        except (httpx.HTTPError, KeyError, IndexError, TypeError, json.JSONDecodeError):
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, json.JSONDecodeError, RuntimeError):
             return None
+
+    async def _request_gemini(
+        self, api_key: str, model: str, system_prompt: str, user_prompt: str
+    ) -> str:
+        try:
+            from google import genai
+        except ImportError as error:
+            raise RuntimeError("Install google-genai to use Gemini") from error
+
+        def create_interaction():
+            client = genai.Client(api_key=api_key)
+            interaction = client.interactions.create(
+                model=model,
+                input=f"{system_prompt}\n\n{user_prompt}",
+            )
+            return interaction.output_text
+
+        return await asyncio.to_thread(create_interaction)
