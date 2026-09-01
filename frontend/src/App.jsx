@@ -1,122 +1,48 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { useEffect, useRef, useState } from 'react'
+import { api, openLessonSocket } from './api'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [student, setStudent] = useState({ name: 'Aarav', level: 'beginner', preferred_language: 'en', learning_goal: 'Build strong science fundamentals' })
+  const [lesson, setLesson] = useState({ topic: "Ohm's Law", learner_level: 'beginner', language: 'en', available_time_minutes: 30, learning_goal: 'Understand voltage, current, and resistance.', teaching_style: 'simple' })
+  const [profile, setProfile] = useState(null)
+  const [lessonData, setLessonData] = useState(null)
+  const [assessment, setAssessment] = useState(null)
+  const [document, setDocument] = useState(null)
+  const [status, setStatus] = useState('Checking API connection...')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const socketRef = useRef(null)
+
+  useEffect(() => {
+    api.health().then(() => setStatus('API connected')).catch(() => setStatus('API offline'))
+    return () => socketRef.current?.close()
+  }, [])
+
+  const update = (setter, field, value) => setter((current) => ({ ...current, [field]: value }))
+  const run = async (action, successMessage) => {
+    setBusy(true); setMessage('')
+    try { await action(); setMessage(successMessage) } catch (error) { setMessage(error.message) } finally { setBusy(false) }
+  }
+  const createStudent = () => run(async () => setProfile(await api.createStudent(student)), 'Student profile created')
+  const createLesson = () => run(async () => setLessonData(await api.createLesson(lesson)), 'Lesson plan generated')
+  const generateAssessment = () => run(async () => setAssessment(await api.generateAssessment({ student_id: profile?.id || 'student_001', lesson_id: lessonData?.lesson_id || 'lesson_001', question_ids: ['question_001', 'question_002'] })), 'Assessment generated')
+  const uploadDocument = (event) => {
+    const file = event.target.files?.[0]; if (!file) return
+    const formData = new FormData(); formData.append('file', file); formData.append('title', file.name); formData.append('language', lesson.language)
+    run(async () => setDocument(await api.uploadDocument(formData)), 'Document uploaded and processed')
+  }
+  const startLesson = () => run(async () => {
+    const lessonId = lessonData?.lesson_id || 'lesson_001'; await api.lessonAction(lessonId, 'start')
+    socketRef.current?.close(); socketRef.current = openLessonSocket(lessonId, setMessage, () => setMessage('WebSocket connection unavailable'))
+  }, 'Lesson started. Teacher channel is ready.')
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <main className="min-h-screen bg-[#f5f6f0] text-slate-900"><header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5"><div><p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-700">AI Teacher</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Your learning studio</h1></div><div className={`rounded-full px-3 py-1 text-xs font-semibold ${status === 'API connected' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{status}</div></div></header><div className="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-[1.05fr_0.95fr]"><section className="space-y-6"><div className="rounded-3xl bg-[#0e3b32] p-8 text-white shadow-xl"><p className="text-sm text-emerald-200">A focused session for today</p><h2 className="mt-3 text-4xl font-semibold tracking-tight">Learn clearly. Practice boldly.</h2><p className="mt-4 max-w-lg text-sm leading-6 text-emerald-100">Create a profile, generate a lesson, and use the live teacher channel to keep learning adaptive.</p><div className="mt-7 flex flex-wrap gap-3 text-xs font-semibold"><span className="rounded-full bg-white/10 px-3 py-2">English · Hindi · Hinglish</span><span className="rounded-full bg-lime-300 px-3 py-2 text-emerald-950">Connected to FastAPI</span></div></div><div className="grid gap-6 md:grid-cols-2"><Panel title="01 · Student profile" detail="Tell the teacher who is learning."><input className="field" value={student.name} onChange={(e) => update(setStudent, 'name', e.target.value)} placeholder="Student name" /><div className="grid grid-cols-2 gap-3"><select className="field" value={student.level} onChange={(e) => update(setStudent, 'level', e.target.value)}><option>beginner</option><option>intermediate</option><option>advanced</option></select><select className="field" value={student.preferred_language} onChange={(e) => update(setStudent, 'preferred_language', e.target.value)}><option value="en">English</option><option value="hi">Hindi</option><option value="hinglish">Hinglish</option></select></div><input className="field" value={student.learning_goal} onChange={(e) => update(setStudent, 'learning_goal', e.target.value)} placeholder="Learning goal" /><button className="button" disabled={busy} onClick={createStudent}>Create profile</button></Panel><Panel title="02 · Study material" detail="Add context for the lesson engine."><label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm text-slate-500 hover:border-emerald-500"><span className="text-2xl">↑</span><span>{document ? document.metadata?.file_name : 'Upload a PDF, DOCX, or PPTX'}</span><input className="hidden" type="file" onChange={uploadDocument} /></label>{document && <p className="text-xs text-emerald-700">{document.chunks_count} chunks processed</p>}</Panel></div><Panel title="03 · Generate a lesson" detail="Shape the next lesson around the learner."><div className="grid gap-3 sm:grid-cols-2"><input className="field" value={lesson.topic} onChange={(e) => update(setLesson, 'topic', e.target.value)} placeholder="Topic" /><select className="field" value={lesson.teaching_style} onChange={(e) => update(setLesson, 'teaching_style', e.target.value)}><option value="simple">Simple explanations</option><option value="visual">Visual learning</option><option value="socratic">Socratic questions</option></select><select className="field" value={lesson.language} onChange={(e) => update(setLesson, 'language', e.target.value)}><option value="en">English</option><option value="hi">Hindi</option><option value="hinglish">Hinglish</option></select><input className="field" type="number" min="5" value={lesson.available_time_minutes} onChange={(e) => update(setLesson, 'available_time_minutes', Number(e.target.value))} /></div><textarea className="field min-h-24" value={lesson.learning_goal} onChange={(e) => update(setLesson, 'learning_goal', e.target.value)} placeholder="What should the learner achieve?" /><button className="button" disabled={busy} onClick={createLesson}>Generate lesson plan</button></Panel></section><section className="space-y-6"><Panel title="Lesson workspace" detail={lessonData ? `${lessonData.plan.duration_minutes} minutes · ${lessonData.plan.language}` : 'Your generated plan will appear here.'}>{lessonData ? <div className="space-y-5"><div><p className="text-xs font-bold uppercase tracking-widest text-emerald-700">{lessonData.plan.level}</p><h2 className="mt-1 text-3xl font-semibold">{lessonData.plan.topic}</h2></div><div className="rounded-2xl bg-emerald-50 p-5"><p className="font-semibold text-emerald-950">{lessonData.plan.objectives[0].concept}</p><p className="mt-2 text-sm leading-6 text-emerald-900">{lessonData.plan.objectives[0].explanation}</p><p className="mt-3 text-sm italic text-emerald-700">Example: {lessonData.plan.objectives[0].example}</p></div><div><p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">Questions to explore</p>{lessonData.plan.questions_to_ask.map((question) => <p className="border-b border-slate-100 py-2 text-sm" key={question}>{question}</p>)}</div><div className="flex flex-wrap gap-3"><button className="button" onClick={startLesson}>Start live lesson</button><button className="button-secondary" onClick={() => run(() => api.lessonAction(lessonData.lesson_id, 'adapt'), 'Lesson adapted to current progress')}>Adapt lesson</button></div></div> : <EmptyState />}</Panel><Panel title="Progress check" detail="Generate a report after the lesson.">{assessment ? <div className="space-y-4"><div className="flex items-end gap-3"><span className="text-5xl font-semibold text-emerald-700">{assessment.score}%</span><span className="pb-2 text-sm text-slate-500">readiness score</span></div><p className="text-sm"><strong>Strong:</strong> {assessment.strong_areas.join(', ')}</p><p className="text-sm"><strong>Practice next:</strong> {assessment.weak_areas.join(', ')}</p><p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Next topic: {assessment.next_topic}</p></div> : <><p className="text-sm leading-6 text-slate-500">The assessment endpoint will evaluate the current lesson and recommend the next topic.</p><button className="button-secondary mt-4" onClick={generateAssessment}>Generate assessment</button></>}</Panel>{message && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{message}</div>}</section></div></main>
   )
 }
+
+function Panel({ title, detail, children }) { return <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="mb-5"><h2 className="text-lg font-semibold">{title}</h2><p className="mt-1 text-sm text-slate-500">{detail}</p></div><div className="space-y-3">{children}</div></div> }
+function EmptyState() { return <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl bg-slate-50 px-8 text-center"><span className="text-4xl">✦</span><p className="mt-4 font-semibold">No lesson plan yet</p><p className="mt-2 max-w-xs text-sm leading-6 text-slate-500">Complete the details to bring the teacher workspace to life.</p></div> }
 
 export default App

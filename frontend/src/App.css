@@ -182,3 +182,50 @@
     border-right-color: var(--border);
   }
 }
+
+.field {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #dbe2e0;
+  border-radius: 0.85rem;
+  background: #f8faf9;
+  padding: 0.75rem 0.85rem;
+  color: #0f172a;
+  outline: none;
+}
+
+.field:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 15%);
+}
+
+.button,
+.button-secondary {
+  cursor: pointer;
+  border: 0;
+  border-radius: 0.85rem;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.button {
+  background: #0e3b32;
+  color: white;
+}
+
+.button-secondary {
+  background: #e7f1ed;
+  color: #0e3b32;
+}
+
+.button:hover,
+.button-secondary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 10%);
+}
+
+.button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
