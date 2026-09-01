@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
     openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
+    openai_model: str = "gpt-5.6"
     grok_api_key: str = ""
     grok_model: str = "grok-3-mini"
     deepseek_api_key: str = ""

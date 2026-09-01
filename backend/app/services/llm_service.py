@@ -43,11 +43,12 @@ class LLMService:
         try:
             if provider == "gemini":
                 content = await self._request_gemini(api_key, model, system_prompt, user_prompt)
+            elif provider == "openai":
+                content = await self._request_openai(api_key, model, system_prompt, user_prompt)
             elif provider == "deepseek":
                 content = await self._request_deepseek(api_key, model, system_prompt, user_prompt)
             else:
                 base_urls = {
-                    "openai": "https://api.openai.com/v1",
                     "grok": "https://api.x.ai/v1",
                 }
                 response = await client.post(
@@ -111,3 +112,22 @@ class LLMService:
             return response.choices[0].message.content or ""
 
         return await asyncio.to_thread(create_completion)
+
+    async def _request_openai(
+        self, api_key: str, model: str, system_prompt: str, user_prompt: str
+    ) -> str:
+        try:
+            from openai import OpenAI
+        except ImportError as error:
+            raise RuntimeError("Install openai to use OpenAI") from error
+
+        def create_response():
+            client = OpenAI(api_key=api_key)
+            response = client.responses.create(
+                model=model,
+                instructions=system_prompt,
+                input=user_prompt,
+            )
+            return response.output_text or ""
+
+        return await asyncio.to_thread(create_response)
