@@ -15,8 +15,13 @@ function App() {
   const socketRef = useRef(null)
 
   useEffect(() => {
-    api.health().then(() => setStatus('API connected')).catch(() => setStatus('API offline'))
-    return () => socketRef.current?.close()
+    const checkHealth = () => api.health().then(() => setStatus('API connected')).catch(() => setStatus('API offline'))
+    checkHealth()
+    const healthTimer = setInterval(checkHealth, 5000)
+    return () => {
+      clearInterval(healthTimer)
+      socketRef.current?.close()
+    }
   }, [])
 
   const update = (setter, field, value) => setter((current) => ({ ...current, [field]: value }))
