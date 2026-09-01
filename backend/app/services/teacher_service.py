@@ -1,12 +1,30 @@
 from typing import Any, Dict
 
+from app.services.llm_service import LLMService
+
 
 class TeacherService:
+    def __init__(self):
+        self.llm = LLMService()
+
     async def create_lesson_plan(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         topic = payload.get("topic")
         learner_level = payload.get("learner_level", "beginner")
         language = payload.get("language", "en")
         time_minutes = payload.get("available_time_minutes", 20)
+
+        ai_plan = await self.llm.generate_json(
+            "You are an adaptive teacher. Return only valid JSON with keys: objectives, questions_to_ask, assessment_plan, visual_plan. Each objective needs concept, explanation, example, visual_type.",
+            f"Create a {time_minutes}-minute {learner_level} lesson in {language} about {topic}. Learning goal: {payload.get('learning_goal') or 'understand the topic'}. Source material: {payload.get('source_context') or 'none'}.",
+        )
+        if ai_plan and all(key in ai_plan for key in ("objectives", "questions_to_ask", "assessment_plan", "visual_plan")):
+            return {
+                "topic": topic,
+                "level": learner_level,
+                "language": language,
+                "duration_minutes": time_minutes,
+                **ai_plan,
+            }
 
         return {
             "topic": topic,
